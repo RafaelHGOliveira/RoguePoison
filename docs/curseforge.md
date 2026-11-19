@@ -9,7 +9,7 @@ When a weapon has no poison, Rogue Poison shows a bar at the top of the screen w
 - **One row per weapon:** main hand and off hand each get their own row, so a click always coats the right one.
 - **Your poisons, ready to click:** every rank of Instant, Deadly, Wound, Crippling, Mind-numbing and Occult Poison, plus Sebacious, Numbing and Atrophic Poison, with how many you carry.
 - **Stays out of the way:** the bar only shows when a weapon needs poison, and hides in combat.
-- **Works with Rogue WeaponSwap:** it also watches the dagger or sword waiting in your bags. Poison it there and it comes out poisoned at the next swap.
+- **Works with [Rogue WeaponSwap](https://www.curseforge.com/wow/addons/rogue-weaponswap):** it also watches the dagger or sword waiting in your bags. Poison it there and it comes out poisoned at the next swap.
 - **Tooltips:** hover a poison or the weapon icon for its tooltip.
 
 ## Getting started
