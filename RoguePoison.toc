@@ -3,6 +3,7 @@
 ## Notes: Shows a bar at the top of the screen when a weapon has no poison; click a poison to apply it. /rpoison for help.
 ## Version: 0.1.0
 ## IconTexture: Interface\AddOns\RoguePoison\Media\icon
+## X-Curse-Project-ID: 1817450
 ## SavedVariablesPerCharacter: RoguePoisonDB
 ## OptionalDeps: WeaponSwap
 
