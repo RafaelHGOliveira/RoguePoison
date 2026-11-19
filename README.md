@@ -29,6 +29,14 @@ poison or the weapon icon for its tooltip.
 - You are out of combat. The game does not let an addon show, hide or change click
   buttons in combat, so the bar hides when a fight starts and comes back when it ends.
 
+## Works with WeaponSwap
+
+[WeaponSwap](https://www.curseforge.com/wow/addons/rogue-weaponswap) keeps a dagger in
+your main hand for the opener and a sword for the rest of the fight. Rogue Poison reads
+the two weapons saved in it, so besides what you hold it also watches the one waiting
+in your bags. Poison it there and it comes out poisoned at the next swap. Each addon
+works without the other.
+
 ## Install
 
 Copy the `RoguePoison` folder to
