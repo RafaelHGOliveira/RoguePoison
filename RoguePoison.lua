@@ -27,7 +27,7 @@ local POISONS = {
 }
 local MAX_BUTTONS = 12
 local MAX_ROWS = 4 -- main hand, off hand, WeaponSwap's dagger and sword
-local ICON, BUTTON, GAP, PAD, SIDE_GAP = 36, 32, 4, 10, 24
+local ICON, BUTTON, GAP, PAD, ROW_GAP = 36, 32, 4, 10, 8
 -- Instant Poison, the first one, requires level 20 (kb item 6947).
 local POISON_LEVEL = 20
 
@@ -169,15 +169,6 @@ if panel.SetBackdrop then
 end
 panel:Hide()
 
-local separators = {}
-for i = 1, MAX_ROWS - 1 do
-  local line = panel:CreateTexture(nil, "ARTWORK")
-  line:SetColorTexture(0.6, 0.6, 0.6, 0.35)
-  line:SetSize(1, ICON + 4)
-  line:Hide()
-  separators[i] = line
-end
-
 -- Icon cropped to drop the built-in edge, inside a 1 px black frame.
 local function makeIcon(parent, layer, size)
   local icon = parent:CreateTexture(nil, layer)
@@ -314,18 +305,17 @@ local function layout()
     row:Hide()
     row.entry = nil
   end
-  for _, line in ipairs(separators) do line:Hide() end
   if #show == 0 then
     panel:Hide()
     return
   end
+  while #show > #rows do tremove(show) end
 
-  -- Weapons side by side: each one is its icon, its texts, then its poisons.
-  local n = math.min(#poisons, MAX_BUTTONS)
-  local x = PAD + 2
+  -- Texts first: the widest one decides where the poison column starts, so the
+  -- buttons of every row line up.
+  local textWidth = 0
   for idx, e in ipairs(show) do
     local row = rows[idx]
-    if not row then break end
     row.entry = e
     local link, icon
     if e.bag then
@@ -343,10 +333,15 @@ local function layout()
     if e.bag then
       log("%s %d/%d tooltip poison line: %s", e.label, e.bag, e.slot, tostring(e.line))
     end
+    textWidth = math.max(textWidth, row.name:GetStringWidth(), row.status:GetStringWidth())
+  end
 
-    local textWidth = math.max(row.name:GetStringWidth(), row.status:GetStringWidth())
-    local buttonsX = ICON + 8 + textWidth + 12
-    local width = n > 0 and (buttonsX + n * BUTTON + (n - 1) * GAP) or (ICON + 8 + textWidth)
+  -- Weapons one under the other: icon, texts, then the poisons.
+  local n = math.min(#poisons, MAX_BUTTONS)
+  local buttonsX = ICON + 8 + textWidth + 16
+  local width = n > 0 and (buttonsX + n * BUTTON + (n - 1) * GAP) or (ICON + 8 + textWidth)
+  for idx, e in ipairs(show) do
+    local row = rows[idx]
     for j, b in ipairs(row.buttons) do
       local p = poisons[j]
       if p and j <= n then
@@ -365,17 +360,10 @@ local function layout()
     end
     row:SetWidth(width)
     row:ClearAllPoints()
-    row:SetPoint("TOPLEFT", panel, "TOPLEFT", x, -PAD)
+    row:SetPoint("TOPLEFT", panel, "TOPLEFT", PAD + 2, -PAD - (idx - 1) * (ICON + ROW_GAP))
     row:Show()
-    x = x + width + SIDE_GAP
-    -- A thin line before the next weapon.
-    if show[idx + 1] and separators[idx] then
-      separators[idx]:ClearAllPoints()
-      separators[idx]:SetPoint("TOP", panel, "TOPLEFT", x - SIDE_GAP / 2, -PAD + 2)
-      separators[idx]:Show()
-    end
   end
-  panel:SetSize(x - SIDE_GAP + PAD + 2, ICON + 2 * PAD)
+  panel:SetSize(width + 2 * PAD + 4, #show * ICON + (#show - 1) * ROW_GAP + 2 * PAD)
   panel:Show()
 end
 
