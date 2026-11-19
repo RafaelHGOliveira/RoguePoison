@@ -1,5 +1,7 @@
 # Rogue Poison
 
+<p align="center"><img src="Media/logo.png" width="200" alt="Rogue Poison logo"></p>
+
 A rogue addon for [WoW Forever](https://www.wowhead.com/forever). When a weapon you
 hold has no poison, a bar at the top of the screen says which one and shows the
 poisons in your bags. Click a poison and it goes on that weapon.
