@@ -317,17 +317,28 @@ local function layout()
   for idx, e in ipairs(show) do
     local row = rows[idx]
     row.entry = e
-    local link, icon
+    local link, icon, quality
     if e.bag then
       link = Container.GetContainerItemLink(e.bag, e.slot)
       icon = select(5, GetItemInfoInstant(e.weapon))
+      local info = C_Container and C_Container.GetContainerItemInfo(e.bag, e.slot)
+      quality = info and info.quality
     else
       link = GetInventoryItemLink("player", e.slot)
       icon = GetInventoryItemTexture("player", e.slot) or select(5, GetItemInfoInstant(e.weapon))
+      quality = GetInventoryItemQuality("player", e.slot)
     end
     row.weapon:SetTexture(icon)
-    -- The link carries the quality colour; drop only the hyperlink and the brackets.
-    row.name:SetText(link and (link:gsub("|H.-|h%[(.-)%]|h", "%1")) or "")
+    -- Only the name from the link, coloured here: keeping the link's own colour code left
+    -- the name blank on Forever (screenshot 2026-11-19).
+    row.name:SetText(link and link:match("%[(.-)%]") or "")
+    local color = ITEM_QUALITY_COLORS and ITEM_QUALITY_COLORS[quality or 1]
+    if color then
+      row.name:SetTextColor(color.r, color.g, color.b)
+    else
+      row.name:SetTextColor(1, 1, 1)
+    end
+    log("%s link %s", e.label, link and link:gsub("|", "||") or "nil")
     row.status:SetText(e.label .. (#poisons > 0 and ": no poison"
       or ": no poison, none in your bags"))
     if e.bag then
