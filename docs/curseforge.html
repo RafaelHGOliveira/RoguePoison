@@ -1,0 +1,28 @@
+<p><em>Never fight with a dry blade again.</em></p>
+<p>When a weapon has no poison, Rogue Poison shows a bar at the top of the screen with the weapon and the poisons in your bags. Click a poison and it goes on that weapon. No dragging poisons onto the character sheet, no macros to write.</p>
+<h2>At a glance</h2>
+<ul>
+<li><strong>One row per weapon:</strong> main hand and off hand each get their own row, so a click always coats the right one.</li>
+<li><strong>Your poisons, ready to click:</strong> every rank of Instant, Deadly, Wound, Crippling, Mind-numbing and Occult Poison, plus Sebacious, Numbing and Atrophic Poison, with how many you carry.</li>
+<li><strong>Stays out of the way:</strong> the bar only shows when a weapon needs poison, and hides in combat.</li>
+<li><strong>Works with Rogue WeaponSwap:</strong> it also watches the dagger or sword waiting in your bags. Poison it there and it comes out poisoned at the next swap.</li>
+<li><strong>Tooltips:</strong> hover a poison or the weapon icon for its tooltip.</li>
+</ul>
+<h2>Getting started</h2>
+<p>Install and log in. That is all: there is nothing to set up. The bar appears on its own when a weapon you hold has no poison, from level 20 or as soon as you carry a poison.</p>
+<h2>Slash commands</h2>
+<ul>
+<li><code>/rpoison</code>: say which weapons have a poison</li>
+<li><code>/rpoison test</code>: show the bar on poisoned weapons too, to see it or replace a poison</li>
+<li><code>/rpoison debug</code>: turn the debug log on or off</li>
+</ul>
+<h2>FAQ</h2>
+<p><strong>Why does the bar disappear in combat?</strong><br>
+The game does not let an addon show, hide or change click buttons in combat. The bar hides when a fight starts and comes back when it ends.</p>
+<p><strong>Can I use it without WeaponSwap?</strong><br>
+Yes. Without it, Rogue Poison watches your main hand and off hand only.</p>
+<p><strong>Something went wrong. What do I send?</strong><br>
+Type <code>/rpoison debug</code>, reproduce the problem and <code>/reload</code>. Then post the contents of <code>WTF\Account\&lt;account&gt;\&lt;realm&gt;\&lt;character&gt;\SavedVariables\RoguePoison.lua</code> in the comments.</p>
+<h2>Supported versions</h2>
+<p>WoW Forever (1.60.1). Other Classic clients are untested.</p>
+<p>MIT license.</p>
