@@ -11,6 +11,7 @@
 
 local GetItemInfoInstant = GetItemInfoInstant or C_Item.GetItemInfoInstant
 local GetItemCount = GetItemCount or C_Item.GetItemCount
+local GetItemInfo = GetItemInfo or C_Item.GetItemInfo
 local Container = C_Container or _G
 
 -- Rogue poisons in the Forever item data (python -m kb search poison --kind item and
@@ -244,11 +245,10 @@ for i = 1, MAX_ROWS do
   fade:SetDuration(0.8)
   row:SetScript("OnShow", function() pulse:Play() end)
 
-  row.name = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-  row.name:SetPoint("TOPLEFT", row.weapon, "TOPRIGHT", 8, -3)
-  row.status = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-  row.status:SetPoint("BOTTOMLEFT", row.weapon, "BOTTOMRIGHT", 8, 4)
-  row.status:SetTextColor(1, 0.35, 0.35)
+  row.text = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+  row.text:SetPoint("LEFT", row.weapon, "RIGHT", 8, 0)
+  row.text:SetJustifyH("LEFT")
+  row.text:SetSpacing(3)
 
   row.buttons = {}
   for j = 1, MAX_BUTTONS do
@@ -329,22 +329,24 @@ local function layout()
       quality = GetInventoryItemQuality("player", e.slot)
     end
     row.weapon:SetTexture(icon)
-    -- Only the name from the link, coloured here: keeping the link's own colour code left
-    -- the name blank on Forever (screenshot 2026-11-19).
-    row.name:SetText(link and link:match("%[(.-)%]") or "")
-    local color = ITEM_QUALITY_COLORS and ITEM_QUALITY_COLORS[quality or 1]
-    if color then
-      row.name:SetTextColor(color.r, color.g, color.b)
-    else
-      row.name:SetTextColor(1, 1, 1)
+    -- Name and status in one font string, two lines, like the first version that showed
+    -- the name. With a separate font string for the name it stayed blank on Forever
+    -- (screenshots 2026-11-19), so the colours are inline codes.
+    local name = link and link:match("%[(.-)%]")
+    if not name or name == "" then
+      name = (C_Item and C_Item.GetItemNameByID and C_Item.GetItemNameByID(e.weapon))
+        or GetItemInfo(e.weapon) or ""
     end
-    log("%s link %s", e.label, link and link:gsub("|", "||") or "nil")
-    row.status:SetText(e.label .. (#poisons > 0 and ": no poison"
-      or ": no poison, none in your bags"))
+    local color = ITEM_QUALITY_COLORS and ITEM_QUALITY_COLORS[quality or 1]
+    local hex = color and format("%02x%02x%02x", color.r * 255, color.g * 255, color.b * 255)
+      or "ffffff"
+    row.text:SetFormattedText("|cff%s%s|r\n|cffff5959%s: no poison%s|r", hex, name, e.label,
+      #poisons > 0 and "" or ", none in your bags")
+    log("%s link %s name %s", e.label, link and link:gsub("|", "||") or "nil", name)
     if e.bag then
       log("%s %d/%d tooltip poison line: %s", e.label, e.bag, e.slot, tostring(e.line))
     end
-    textWidth = math.max(textWidth, row.name:GetStringWidth(), row.status:GetStringWidth())
+    textWidth = math.max(textWidth, row.text:GetStringWidth())
   end
 
   -- Weapons one under the other: icon, texts, then the poisons.
