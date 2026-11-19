@@ -23,7 +23,7 @@ local POISONS = {
   217345, 217346, 217347,             -- Sebacious, Numbing, Atrophic Poison
 }
 local MAX_BUTTONS = 12
-local BUTTON, GAP = 36, 4
+local ICON, BUTTON, GAP, PAD, ROW_GAP = 36, 32, 4, 10, 8
 -- Instant Poison, the first one, requires level 20 (kb item 6947).
 local POISON_LEVEL = 20
 
@@ -92,23 +92,51 @@ local function bagPoisons()
 end
 
 -- Frames ---------------------------------------------------------------------------
+-- One tooltip-style panel. Each weapon without poison is a row: its icon with a pulsing
+-- red glow, its name in item-quality colour and the hand under it, then the poisons.
 
 local bar = CreateFrame("Frame", "RoguePoisonBar", UIParent)
 bar:SetSize(1, 1)
 bar:SetPoint("TOP", UIParent, "TOP", 0, -90)
 RegisterStateDriver(bar, "visibility", "[combat] hide; show")
 
-local function makeButton(block, slot)
-  local b = CreateFrame("Button", nil, block, "SecureActionButtonTemplate")
+local panel = CreateFrame("Frame", nil, bar, BackdropTemplateMixin and "BackdropTemplate" or nil)
+panel:SetPoint("TOP")
+if panel.SetBackdrop then
+  panel:SetBackdrop({
+    bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
+    edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+    tile = true, tileSize = 16, edgeSize = 16,
+    insets = { left = 4, right = 4, top = 4, bottom = 4 },
+  })
+  panel:SetBackdropColor(0.05, 0.05, 0.05, 0.9)
+  panel:SetBackdropBorderColor(0.6, 0.6, 0.6)
+end
+panel:Hide()
+
+-- Icon cropped to drop the built-in edge, inside a 1 px black frame.
+local function makeIcon(parent, layer, size)
+  local icon = parent:CreateTexture(nil, layer)
+  icon:SetSize(size, size)
+  icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+  local edge = parent:CreateTexture(nil, "BACKGROUND")
+  edge:SetColorTexture(0, 0, 0, 1)
+  edge:SetPoint("TOPLEFT", icon, -1, 1)
+  edge:SetPoint("BOTTOMRIGHT", icon, 1, -1)
+  return icon
+end
+
+local function makeButton(row, slot)
+  local b = CreateFrame("Button", nil, row, "SecureActionButtonTemplate")
   b:SetSize(BUTTON, BUTTON)
   -- Both, so the click goes off once whatever the "cast on key down" setting is.
   b:RegisterForClicks("AnyUp", "AnyDown")
   b:SetAttribute("type", "item")
   b:SetAttribute("target-slot", slot)
-  b.icon = b:CreateTexture(nil, "ARTWORK")
-  b.icon:SetAllPoints()
+  b.icon = makeIcon(b, "ARTWORK", BUTTON)
+  b.icon:SetPoint("CENTER")
   b.count = b:CreateFontString(nil, "OVERLAY", "NumberFontNormal")
-  b.count:SetPoint("BOTTOMRIGHT", -2, 2)
+  b.count:SetPoint("BOTTOMRIGHT", -1, 2)
   b:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
   b:SetScript("OnEnter", function(self)
     GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
@@ -124,22 +152,39 @@ local function makeButton(block, slot)
   return b
 end
 
-local blocks = {}
+local rows = {}
 for i, hand in ipairs(HANDS) do
-  local block = CreateFrame("Frame", nil, bar)
-  block:SetHeight(26 + BUTTON + 8)
-  local bg = block:CreateTexture(nil, "BACKGROUND")
-  bg:SetAllPoints()
-  bg:SetColorTexture(0, 0, 0, 0.6)
-  block.text = block:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-  block.text:SetPoint("TOP", 0, -6)
-  block.text:SetTextColor(1, 0.3, 0.3)
-  block.buttons = {}
+  local row = CreateFrame("Frame", nil, panel)
+  row:SetHeight(ICON)
+  row.weapon = makeIcon(row, "ARTWORK", ICON)
+  row.weapon:SetPoint("LEFT")
+
+  local glow = row:CreateTexture(nil, "OVERLAY")
+  glow:SetTexture("Interface\\Buttons\\UI-ActionButton-Border")
+  glow:SetBlendMode("ADD")
+  glow:SetVertexColor(1, 0.15, 0.15)
+  glow:SetSize(ICON * 1.8, ICON * 1.8)
+  glow:SetPoint("CENTER", row.weapon)
+  local pulse = glow:CreateAnimationGroup()
+  pulse:SetLooping("BOUNCE")
+  local fade = pulse:CreateAnimation("Alpha")
+  fade:SetFromAlpha(0.2)
+  fade:SetToAlpha(1)
+  fade:SetDuration(0.8)
+  row:SetScript("OnShow", function() pulse:Play() end)
+
+  row.name = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+  row.name:SetPoint("TOPLEFT", row.weapon, "TOPRIGHT", 8, -3)
+  row.status = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+  row.status:SetPoint("BOTTOMLEFT", row.weapon, "BOTTOMRIGHT", 8, 4)
+  row.status:SetTextColor(1, 0.35, 0.35)
+
+  row.buttons = {}
   for j = 1, MAX_BUTTONS do
-    block.buttons[j] = makeButton(block, hand.slot)
+    row.buttons[j] = makeButton(row, hand.slot)
   end
-  block:Hide()
-  blocks[i] = block
+  row:Hide()
+  rows[i] = row
 end
 
 -- Layout ---------------------------------------------------------------------------
@@ -158,7 +203,7 @@ local function layout()
     for i, hand in ipairs(HANDS) do
       local weapon = weaponIn(hand.slot)
       if weapon and (testMode or not state[hand.slot]) then
-        tinsert(show, { block = blocks[i], hand = hand, weapon = weapon })
+        tinsert(show, { row = rows[i], hand = hand, weapon = weapon })
       end
     end
   end
@@ -172,23 +217,34 @@ local function layout()
   lastKey = key
   log("layout %s", key ~= "" and key or "(hidden)")
 
-  for _, block in ipairs(blocks) do block:Hide() end
-  local y = 0
-  for _, s in ipairs(show) do
-    local block = s.block
-    local icon = GetInventoryItemTexture("player", s.hand.slot) or select(5, GetItemInfoInstant(s.weapon))
-    local name = GetInventoryItemLink("player", s.hand.slot)
-    name = name and name:match("%[(.-)%]") or ""
-    if #poisons > 0 then
-      block.text:SetFormattedText("|T%s:16|t %s has no poison: %s", icon, s.hand.label, name)
-    else
-      block.text:SetFormattedText("|T%s:16|t %s has no poison, and none in your bags", icon,
-        s.hand.label)
-    end
+  for _, row in ipairs(rows) do row:Hide() end
+  if #show == 0 then
+    panel:Hide()
+    return
+  end
 
-    local n = math.min(#poisons, MAX_BUTTONS)
-    local rowWidth = n * BUTTON + math.max(n - 1, 0) * GAP
-    for j, b in ipairs(block.buttons) do
+  -- Texts first: the widest one decides where the poison column starts, so the
+  -- buttons of both rows line up.
+  local textWidth = 0
+  for _, s in ipairs(show) do
+    local row, slot = s.row, s.hand.slot
+    row.weapon:SetTexture(GetInventoryItemTexture("player", slot)
+      or select(5, GetItemInfoInstant(s.weapon)))
+    local link = GetInventoryItemLink("player", slot)
+    row.name:SetText(link and link:match("%[(.-)%]") or "")
+    local color = ITEM_QUALITY_COLORS and ITEM_QUALITY_COLORS[GetInventoryItemQuality("player", slot) or 1]
+    if color then row.name:SetTextColor(color.r, color.g, color.b) end
+    row.status:SetText(s.hand.label .. (#poisons > 0 and ": no poison"
+      or ": no poison, none in your bags"))
+    textWidth = math.max(textWidth, row.name:GetStringWidth(), row.status:GetStringWidth())
+  end
+
+  local n = math.min(#poisons, MAX_BUTTONS)
+  local buttonsX = ICON + 8 + textWidth + 16
+  local width = n > 0 and (buttonsX + n * BUTTON + (n - 1) * GAP) or (ICON + 8 + textWidth)
+  for idx, s in ipairs(show) do
+    local row = s.row
+    for j, b in ipairs(row.buttons) do
       local p = poisons[j]
       if p and j <= n then
         b.itemID = p.id
@@ -196,20 +252,19 @@ local function layout()
         b.icon:SetTexture(select(5, GetItemInfoInstant(p.id)))
         b.count:SetText(p.count > 1 and p.count or "")
         b:ClearAllPoints()
-        b:SetPoint("TOPLEFT", block, "TOP", -rowWidth / 2 + (j - 1) * (BUTTON + GAP), -26)
+        b:SetPoint("LEFT", row, "LEFT", buttonsX + (j - 1) * (BUTTON + GAP), 0)
         b:Show()
       else
         b:Hide()
       end
     end
-
-    block:SetHeight(n > 0 and (26 + BUTTON + 8) or 28)
-    block:SetWidth(math.max(rowWidth, block.text:GetStringWidth()) + 24)
-    block:ClearAllPoints()
-    block:SetPoint("TOP", bar, "TOP", 0, y)
-    block:Show()
-    y = y - block:GetHeight() - 6
+    row:SetWidth(width)
+    row:ClearAllPoints()
+    row:SetPoint("TOPLEFT", panel, "TOPLEFT", PAD + 2, -PAD - (idx - 1) * (ICON + ROW_GAP))
+    row:Show()
   end
+  panel:SetSize(width + 2 * PAD + 4, #show * ICON + (#show - 1) * ROW_GAP + 2 * PAD)
+  panel:Show()
 end
 
 -- Events ---------------------------------------------------------------------------

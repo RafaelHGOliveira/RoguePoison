@@ -5,19 +5,18 @@ hold has no poison, a bar at the top of the screen says which one and shows the
 poisons in your bags. Click a poison and it goes on that weapon.
 
 ```
-        ┌──────────────────────────────────────────┐
-        │ Main hand has no poison: Edward's Knife  │
-        │        [Instant] [Deadly] [Crippling]    │
-        └──────────────────────────────────────────┘
-        ┌──────────────────────────────────────────┐
-        │ Off hand has no poison: Cutlass          │
-        │        [Instant] [Deadly] [Crippling]    │
-        └──────────────────────────────────────────┘
+┌───────────────────────────────────────────────────────┐
+│ [icon] Meteor Shard          [Instant] [Deadly] [Crip] │
+│        Main hand: no poison                            │
+│ [icon] Vileblood Scimitar    [Instant] [Deadly] [Crip] │
+│        Off hand: no poison                             │
+└───────────────────────────────────────────────────────┘
 ```
 
-Each weapon gets its own row, so a click on the main-hand row always coats the main
-hand. The number on a button is how many you carry. Hover a button for the poison's
-tooltip.
+Each weapon gets its own row: its icon with a pulsing red glow, its name in its quality
+colour, and the poisons lined up on the right. A click on the main-hand row always coats
+the main hand. The number on a button is how many you carry. Hover a button for the
+poison's tooltip.
 
 ## When it shows
 
