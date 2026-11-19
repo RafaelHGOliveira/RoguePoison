@@ -1,3 +1,5 @@
+<p align="center"><img src="https://raw.githubusercontent.com/RafaelHGOliveira/RoguePoison/main/Media/logo-256.png" width="256" height="256" alt="Rogue Poison"></p>
+
 *Never fight with a dry blade again.*
 
 When a weapon has no poison, Rogue Poison shows a bar at the top of the screen with the weapon and the poisons in your bags. Click a poison and it goes on that weapon. No dragging poisons onto the character sheet, no macros to write.
@@ -29,10 +31,12 @@ The game does not let an addon show, hide or change click buttons in combat. The
 Yes. Without it, Rogue Poison watches your main hand and off hand only.
 
 **Something went wrong. What do I send?**
-Type `/rpoison debug`, reproduce the problem and `/reload`. Then post the contents of `WTF\Account\<account>\<realm>\<character>\SavedVariables\RoguePoison.lua` in the comments.
+Type `/rpoison debug`, reproduce the problem and `/reload`. Then attach `WTF\Account\<account>\<realm>\<character>\SavedVariables\RoguePoison.lua` to an issue on GitHub, or paste it in the comments.
 
 ## Supported versions
 
 WoW Forever (1.60.1). Other Classic clients are untested.
 
-MIT license.
+## Feedback and source
+
+Bug reports, ideas and source code: [github.com/RafaelHGOliveira/RoguePoison](https://github.com/RafaelHGOliveira/RoguePoison). MIT license.
