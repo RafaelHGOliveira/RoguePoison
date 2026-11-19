@@ -1,14 +1,17 @@
--- Rogue Poison: when a weapon you hold has no poison, a bar at the top of the screen
--- names the weapon and lists the poisons in your bags. Clicking one coats that weapon.
+-- Rogue Poison: when a weapon has no poison, a bar at the top of the screen names the
+-- weapon and lists the poisons in your bags. Clicking one coats that weapon. It watches
+-- the main and off hand, and, with WeaponSwap, the dagger or sword waiting in the bags.
 --
 -- Addon code cannot use items, so each poison is a SecureActionButton: type "item" uses
--- the poison, and "target-slot" (16 main hand, 17 off hand) picks the weapon it goes on,
--- the same as "/use Instant Poison" followed by "/use 16" in a macro.
+-- the poison, then "target-slot" (16 main hand, 17 off hand), or "target-bag" plus
+-- "target-slot" for a weapon in the bags, picks the weapon it goes on. That is the macro
+-- "/use Instant Poison" followed by "/use 16".
 -- Secure buttons cannot be moved, shown or hidden in combat, so the bar is laid out only
 -- out of combat and a state driver hides it while you fight.
 
 local GetItemInfoInstant = GetItemInfoInstant or C_Item.GetItemInfoInstant
 local GetItemCount = GetItemCount or C_Item.GetItemCount
+local Container = C_Container or _G
 
 -- Rogue poisons in the Forever item data (python -m kb search poison --kind item and
 -- kb item <id>, 2026-11-18): each is "Classes: Rogue" with "Use: Coats a weapon with
@@ -23,6 +26,7 @@ local POISONS = {
   217345, 217346, 217347,             -- Sebacious, Numbing, Atrophic Poison
 }
 local MAX_BUTTONS = 12
+local MAX_ROWS = 4 -- main hand, off hand, WeaponSwap's dagger and sword
 local ICON, BUTTON, GAP, PAD, SIDE_GAP = 36, 32, 4, 10, 24
 -- Instant Poison, the first one, requires level 20 (kb item 6947).
 local POISON_LEVEL = 20
@@ -91,9 +95,60 @@ local function bagPoisons()
   return found
 end
 
+-- Weapons in the bags ----------------------------------------------------------------
+-- GetWeaponEnchantInfo only covers what you hold. For a weapon in the bags, the poison
+-- shows in its tooltip as a green line ending in the time left, e.g.
+-- "Instant Poison II (29 min)", so a hidden tooltip is read line by line.
+
+local scanner = CreateFrame("GameTooltip", "RoguePoisonScanner", nil, "GameTooltipTemplate")
+
+local function bagItemPoison(bag, slot)
+  scanner:SetOwner(WorldFrame, "ANCHOR_NONE")
+  scanner:ClearLines()
+  scanner:SetBagItem(bag, slot)
+  for i = 2, scanner:NumLines() do
+    local line = _G["RoguePoisonScannerTextLeft" .. i]
+    local text = line and line:GetText()
+    if text and text:find("%(%d+ %a+%)") then
+      local r, g = line:GetTextColor()
+      if g > 0.9 and r < 0.2 then return text end
+    end
+  end
+end
+
+local function findInBags(id)
+  if not id then return end -- an empty bag slot also has a nil item id
+  for bag = 0, NUM_BAG_SLOTS or 4 do
+    for i = 1, Container.GetContainerNumSlots(bag) do
+      if Container.GetContainerItemID(bag, i) == id then return bag, i end
+    end
+  end
+end
+
+-- The dagger and sword saved in WeaponSwap (its per-character WeaponSwapDB), when one of
+-- them sits in the bags. With two copies of the sword, the one in the off hand is
+-- already watched as the off hand; the copy in the bags is the one found here.
+local function swapWeapons()
+  local found = {}
+  local ws = WeaponSwapDB
+  if type(ws) ~= "table" then return found end
+  for _, role in ipairs({ "dagger", "sword" }) do
+    local id = ws[role]
+    local bag, slot = findInBags(id)
+    if bag then
+      local line = bagItemPoison(bag, slot)
+      tinsert(found, {
+        label = (role == "dagger" and "Dagger" or "Sword") .. " in bags",
+        bag = bag, slot = slot, weapon = id, poisoned = line ~= nil, line = line,
+      })
+    end
+  end
+  return found
+end
+
 -- Frames ---------------------------------------------------------------------------
 -- One tooltip-style panel. Each weapon without poison is a row: its icon with a pulsing
--- red glow, its name in item-quality colour and the hand under it, then the poisons.
+-- red glow, its name in item-quality colour and where it is under it, then the poisons.
 
 local bar = CreateFrame("Frame", "RoguePoisonBar", UIParent)
 bar:SetSize(1, 1)
@@ -114,9 +169,14 @@ if panel.SetBackdrop then
 end
 panel:Hide()
 
-local separator = panel:CreateTexture(nil, "ARTWORK")
-separator:SetColorTexture(0.6, 0.6, 0.6, 0.35)
-separator:SetSize(1, ICON + 4)
+local separators = {}
+for i = 1, MAX_ROWS - 1 do
+  local line = panel:CreateTexture(nil, "ARTWORK")
+  line:SetColorTexture(0.6, 0.6, 0.6, 0.35)
+  line:SetSize(1, ICON + 4)
+  line:Hide()
+  separators[i] = line
+end
 
 -- Icon cropped to drop the built-in edge, inside a 1 px black frame.
 local function makeIcon(parent, layer, size)
@@ -130,13 +190,12 @@ local function makeIcon(parent, layer, size)
   return icon
 end
 
-local function makeButton(row, slot)
+local function makeButton(row)
   local b = CreateFrame("Button", nil, row, "SecureActionButtonTemplate")
   b:SetSize(BUTTON, BUTTON)
   -- Both, so the click goes off once whatever the "cast on key down" setting is.
   b:RegisterForClicks("AnyUp", "AnyDown")
   b:SetAttribute("type", "item")
-  b:SetAttribute("target-slot", slot)
   b.icon = makeIcon(b, "ARTWORK", BUTTON)
   b.icon:SetPoint("CENTER")
   b.count = b:CreateFontString(nil, "OVERLAY", "NumberFontNormal")
@@ -149,15 +208,16 @@ local function makeButton(row, slot)
   end)
   b:SetScript("OnLeave", function() GameTooltip:Hide() end)
   b:HookScript("OnClick", function(self, button, down)
-    log("click item %s -> slot %d (%s, %s)", tostring(self.itemID), slot, tostring(button),
-      down and "down" or "up")
+    log("click item %s -> bag %s slot %s (%s, %s)", tostring(self.itemID),
+      tostring(self:GetAttribute("target-bag")), tostring(self:GetAttribute("target-slot")),
+      tostring(button), down and "down" or "up")
   end)
   b:Hide()
   return b
 end
 
 local rows = {}
-for i, hand in ipairs(HANDS) do
+for i = 1, MAX_ROWS do
   local row = CreateFrame("Frame", nil, panel)
   row:SetHeight(ICON)
   row.weapon = makeIcon(row, "ARTWORK", ICON)
@@ -167,8 +227,14 @@ for i, hand in ipairs(HANDS) do
   hover:SetAllPoints(row.weapon)
   hover:EnableMouse(true)
   hover:SetScript("OnEnter", function(self)
+    local e = row.entry
+    if not e then return end
     GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
-    GameTooltip:SetInventoryItem("player", hand.slot)
+    if e.bag then
+      GameTooltip:SetBagItem(e.bag, e.slot)
+    else
+      GameTooltip:SetInventoryItem("player", e.slot)
+    end
     GameTooltip:Show()
   end)
   hover:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -195,7 +261,7 @@ for i, hand in ipairs(HANDS) do
 
   row.buttons = {}
   for j = 1, MAX_BUTTONS do
-    row.buttons[j] = makeButton(row, hand.slot)
+    row.buttons[j] = makeButton(row)
   end
   row:Hide()
   rows[i] = row
@@ -206,6 +272,20 @@ end
 local testMode = false
 local lastKey
 
+-- Every weapon to watch: { label, slot, bag (nil when equipped), weapon, poisoned }.
+local function watched(state)
+  local list = {}
+  for _, hand in ipairs(HANDS) do
+    local weapon = weaponIn(hand.slot)
+    if weapon then
+      tinsert(list, { label = hand.label, slot = hand.slot, weapon = weapon,
+        poisoned = state[hand.slot] })
+    end
+  end
+  for _, e in ipairs(swapWeapons()) do tinsert(list, e) end
+  return list
+end
+
 local function layout()
   if InCombatLockdown() then return end
 
@@ -214,24 +294,27 @@ local function layout()
   local isRogue = select(2, UnitClass("player")) == "ROGUE"
   local show = {}
   if state and isRogue and (#poisons > 0 or UnitLevel("player") >= POISON_LEVEL) then
-    for i, hand in ipairs(HANDS) do
-      local weapon = weaponIn(hand.slot)
-      if weapon and (testMode or not state[hand.slot]) then
-        tinsert(show, { row = rows[i], hand = hand, weapon = weapon })
-      end
+    for _, e in ipairs(watched(state)) do
+      if testMode or not e.poisoned then tinsert(show, e) end
     end
   end
 
   -- Skip the rebuild when nothing changed (the ticker calls this every second).
   local parts = {}
-  for _, s in ipairs(show) do tinsert(parts, s.hand.slot .. ":" .. s.weapon) end
+  for _, e in ipairs(show) do
+    tinsert(parts, (e.bag and (e.bag .. "/") or "") .. e.slot .. ":" .. e.weapon)
+  end
   for _, p in ipairs(poisons) do tinsert(parts, p.id .. "x" .. p.count) end
   local key = table.concat(parts, ",")
   if key == lastKey then return end
   lastKey = key
   log("layout %s", key ~= "" and key or "(hidden)")
 
-  for _, row in ipairs(rows) do row:Hide() end
+  for _, row in ipairs(rows) do
+    row:Hide()
+    row.entry = nil
+  end
+  for _, line in ipairs(separators) do line:Hide() end
   if #show == 0 then
     panel:Hide()
     return
@@ -240,16 +323,27 @@ local function layout()
   -- Weapons side by side: each one is its icon, its texts, then its poisons.
   local n = math.min(#poisons, MAX_BUTTONS)
   local x = PAD + 2
-  for idx, s in ipairs(show) do
-    local row, slot = s.row, s.hand.slot
-    row.weapon:SetTexture(GetInventoryItemTexture("player", slot)
-      or select(5, GetItemInfoInstant(s.weapon)))
-    local link = GetInventoryItemLink("player", slot)
-    row.name:SetText(link and link:match("%[(.-)%]") or "")
-    local color = ITEM_QUALITY_COLORS and ITEM_QUALITY_COLORS[GetInventoryItemQuality("player", slot) or 1]
-    if color then row.name:SetTextColor(color.r, color.g, color.b) end
-    row.status:SetText(s.hand.label .. (#poisons > 0 and ": no poison"
+  for idx, e in ipairs(show) do
+    local row = rows[idx]
+    if not row then break end
+    row.entry = e
+    local link, icon
+    if e.bag then
+      link = Container.GetContainerItemLink(e.bag, e.slot)
+      icon = select(5, GetItemInfoInstant(e.weapon))
+    else
+      link = GetInventoryItemLink("player", e.slot)
+      icon = GetInventoryItemTexture("player", e.slot) or select(5, GetItemInfoInstant(e.weapon))
+    end
+    row.weapon:SetTexture(icon)
+    -- The link carries the quality colour; drop only the hyperlink and the brackets.
+    row.name:SetText(link and (link:gsub("|H.-|h%[(.-)%]|h", "%1")) or "")
+    row.status:SetText(e.label .. (#poisons > 0 and ": no poison"
       or ": no poison, none in your bags"))
+    if e.bag then
+      log("%s %d/%d tooltip poison line: %s", e.label, e.bag, e.slot, tostring(e.line))
+    end
+
     local textWidth = math.max(row.name:GetStringWidth(), row.status:GetStringWidth())
     local buttonsX = ICON + 8 + textWidth + 12
     local width = n > 0 and (buttonsX + n * BUTTON + (n - 1) * GAP) or (ICON + 8 + textWidth)
@@ -258,6 +352,8 @@ local function layout()
       if p and j <= n then
         b.itemID = p.id
         b:SetAttribute("item", "item:" .. p.id)
+        b:SetAttribute("target-bag", e.bag)
+        b:SetAttribute("target-slot", e.slot)
         b.icon:SetTexture(select(5, GetItemInfoInstant(p.id)))
         b.count:SetText(p.count > 1 and p.count or "")
         b:ClearAllPoints()
@@ -272,13 +368,13 @@ local function layout()
     row:SetPoint("TOPLEFT", panel, "TOPLEFT", x, -PAD)
     row:Show()
     x = x + width + SIDE_GAP
-    -- A thin line between the two weapons.
-    if idx == 1 then
-      separator:ClearAllPoints()
-      separator:SetPoint("TOP", panel, "TOPLEFT", x - SIDE_GAP / 2, -PAD + 2)
+    -- A thin line before the next weapon.
+    if show[idx + 1] and separators[idx] then
+      separators[idx]:ClearAllPoints()
+      separators[idx]:SetPoint("TOP", panel, "TOPLEFT", x - SIDE_GAP / 2, -PAD + 2)
+      separators[idx]:Show()
     end
   end
-  separator:SetShown(#show > 1)
   panel:SetSize(x - SIDE_GAP + PAD + 2, ICON + 2 * PAD)
   panel:Show()
 end
@@ -296,7 +392,8 @@ events:SetScript("OnEvent", function(_, event)
   if event == "PLAYER_LOGIN" then
     RoguePoisonDB = RoguePoisonDB or {}
     RoguePoisonDB.log = {}
-    log("login, interface %s", tostring(select(4, GetBuildInfo())))
+    log("login, interface %s, WeaponSwap %s", tostring(select(4, GetBuildInfo())),
+      type(WeaponSwapDB) == "table" and "found" or "not found")
     -- A poison wearing off fires no event every client sends, so check each second too.
     C_Timer.NewTicker(1, layout)
   end
@@ -320,9 +417,10 @@ SlashCmdList.ROGUEPOISON = function(msg)
       say("cannot read your weapon enchants: " .. tostring(lastReadError))
     else
       for _, hand in ipairs(HANDS) do
-        local w = weaponIn(hand.slot)
-        say(format("%s: %s", hand.label,
-          not w and "no weapon" or state[hand.slot] and "poisoned" or "no poison"))
+        if not weaponIn(hand.slot) then say(hand.label .. ": no weapon") end
+      end
+      for _, e in ipairs(watched(state)) do
+        say(format("%s: %s", e.label, e.line or (e.poisoned and "poisoned" or "no poison")))
       end
     end
     say("/rpoison test shows the bar on poisoned weapons too; /rpoison debug logs to SavedVariables.")

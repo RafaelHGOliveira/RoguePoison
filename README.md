@@ -22,6 +22,10 @@ poison or the weapon icon for its tooltip.
   (Instant Poison's level). Below that, with no poisons, it stays out of the way.
 - A main-hand or off-hand weapon has no poison. An off-hand item that is not a weapon
   is ignored.
+- With [WeaponSwap](https://www.curseforge.com/wow/addons/rogue-weaponswap) installed,
+  the dagger or sword it saved is waiting in your bags with no poison. Its row reads
+  "Dagger in bags" or "Sword in bags", and a click coats that weapon in the bags, so it
+  is poisoned when WeaponSwap puts it in your hand.
 - You are out of combat. The game does not let an addon show, hide or change click
   buttons in combat, so the bar hides when a fight starts and comes back when it ends.
 
@@ -47,7 +51,10 @@ out, out of combat; the click itself is the game's own code.
 
 Whether a weapon is poisoned comes from `GetWeaponEnchantInfo`. Forever hides some
 values from addons (`UnitPower` is one), so if this one is hidden too, `/rpoison`
-says so and the bar stays hidden.
+says so and the bar stays hidden. That call only covers what you hold; for a weapon in
+the bags, the addon reads its tooltip and looks for the poison's green line with the
+time left, such as "Instant Poison II (29 min)". A poison button for a weapon in the
+bags sets `target-bag` and `target-slot` to that bag slot.
 
 The poisons it knows are listed by item id at the top of `RoguePoison.lua`: Instant,
 Deadly, Wound, Crippling, Mind-numbing and Occult in every rank, plus Sebacious, Numbing
