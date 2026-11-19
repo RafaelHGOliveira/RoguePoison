@@ -23,7 +23,7 @@ local POISONS = {
   217345, 217346, 217347,             -- Sebacious, Numbing, Atrophic Poison
 }
 local MAX_BUTTONS = 12
-local ICON, BUTTON, GAP, PAD, ROW_GAP = 36, 32, 4, 10, 8
+local ICON, BUTTON, GAP, PAD, SIDE_GAP = 36, 32, 4, 10, 24
 -- Instant Poison, the first one, requires level 20 (kb item 6947).
 local POISON_LEVEL = 20
 
@@ -114,6 +114,10 @@ if panel.SetBackdrop then
 end
 panel:Hide()
 
+local separator = panel:CreateTexture(nil, "ARTWORK")
+separator:SetColorTexture(0.6, 0.6, 0.6, 0.35)
+separator:SetSize(1, ICON + 4)
+
 -- Icon cropped to drop the built-in edge, inside a 1 px black frame.
 local function makeIcon(parent, layer, size)
   local icon = parent:CreateTexture(nil, layer)
@@ -158,6 +162,16 @@ for i, hand in ipairs(HANDS) do
   row:SetHeight(ICON)
   row.weapon = makeIcon(row, "ARTWORK", ICON)
   row.weapon:SetPoint("LEFT")
+  -- Textures take no mouse, so a plain frame over the icon shows the weapon's tooltip.
+  local hover = CreateFrame("Frame", nil, row)
+  hover:SetAllPoints(row.weapon)
+  hover:EnableMouse(true)
+  hover:SetScript("OnEnter", function(self)
+    GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
+    GameTooltip:SetInventoryItem("player", hand.slot)
+    GameTooltip:Show()
+  end)
+  hover:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
   local glow = row:CreateTexture(nil, "OVERLAY")
   glow:SetTexture("Interface\\Buttons\\UI-ActionButton-Border")
@@ -223,10 +237,10 @@ local function layout()
     return
   end
 
-  -- Texts first: the widest one decides where the poison column starts, so the
-  -- buttons of both rows line up.
-  local textWidth = 0
-  for _, s in ipairs(show) do
+  -- Weapons side by side: each one is its icon, its texts, then its poisons.
+  local n = math.min(#poisons, MAX_BUTTONS)
+  local x = PAD + 2
+  for idx, s in ipairs(show) do
     local row, slot = s.row, s.hand.slot
     row.weapon:SetTexture(GetInventoryItemTexture("player", slot)
       or select(5, GetItemInfoInstant(s.weapon)))
@@ -236,14 +250,9 @@ local function layout()
     if color then row.name:SetTextColor(color.r, color.g, color.b) end
     row.status:SetText(s.hand.label .. (#poisons > 0 and ": no poison"
       or ": no poison, none in your bags"))
-    textWidth = math.max(textWidth, row.name:GetStringWidth(), row.status:GetStringWidth())
-  end
-
-  local n = math.min(#poisons, MAX_BUTTONS)
-  local buttonsX = ICON + 8 + textWidth + 16
-  local width = n > 0 and (buttonsX + n * BUTTON + (n - 1) * GAP) or (ICON + 8 + textWidth)
-  for idx, s in ipairs(show) do
-    local row = s.row
+    local textWidth = math.max(row.name:GetStringWidth(), row.status:GetStringWidth())
+    local buttonsX = ICON + 8 + textWidth + 12
+    local width = n > 0 and (buttonsX + n * BUTTON + (n - 1) * GAP) or (ICON + 8 + textWidth)
     for j, b in ipairs(row.buttons) do
       local p = poisons[j]
       if p and j <= n then
@@ -260,10 +269,17 @@ local function layout()
     end
     row:SetWidth(width)
     row:ClearAllPoints()
-    row:SetPoint("TOPLEFT", panel, "TOPLEFT", PAD + 2, -PAD - (idx - 1) * (ICON + ROW_GAP))
+    row:SetPoint("TOPLEFT", panel, "TOPLEFT", x, -PAD)
     row:Show()
+    x = x + width + SIDE_GAP
+    -- A thin line between the two weapons.
+    if idx == 1 then
+      separator:ClearAllPoints()
+      separator:SetPoint("TOP", panel, "TOPLEFT", x - SIDE_GAP / 2, -PAD + 2)
+    end
   end
-  panel:SetSize(width + 2 * PAD + 4, #show * ICON + (#show - 1) * ROW_GAP + 2 * PAD)
+  separator:SetShown(#show > 1)
+  panel:SetSize(x - SIDE_GAP + PAD + 2, ICON + 2 * PAD)
   panel:Show()
 end
 
