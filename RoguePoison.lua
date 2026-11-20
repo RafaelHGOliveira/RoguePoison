@@ -5,7 +5,9 @@
 -- Addon code cannot use items, so each poison is a SecureActionButton: type "item" uses
 -- the poison, then "target-slot" (16 main hand, 17 off hand), or "target-bag" plus
 -- "target-slot" for a weapon in the bags, picks the weapon it goes on. That is the macro
--- "/use Instant Poison" followed by "/use 16".
+-- "/use Instant Poison" followed by "/use 16". Not yet confirmed in game (0.1.1,
+-- 2026-11-20): that the click applies the poison, on a held weapon or one in the bags,
+-- and that the tooltip scan below finds the poison on a weapon in the bags.
 -- Secure buttons cannot be moved, shown or hidden in combat, so the bar is laid out only
 -- out of combat and a state driver hides it while you fight.
 
